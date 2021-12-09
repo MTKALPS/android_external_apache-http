@@ -1,4 +1,9 @@
 /*
+* Copyright (C) 2014 MediaTek Inc.
+* Modification based on code covered by the mentioned copyright
+* and/or permission notice(s).
+*/
+/*
  * $HeadURL: http://svn.apache.org/repos/asf/httpcomponents/httpclient/trunk/module-client/src/main/java/org/apache/http/impl/client/AbstractHttpClient.java $
  * $Revision: 677250 $
  * $Date: 2008-07-16 04:45:47 -0700 (Wed, 16 Jul 2008) $
@@ -68,6 +73,29 @@ import org.apache.http.protocol.HttpContext;
 import org.apache.http.protocol.HttpProcessor;
 import org.apache.http.protocol.HttpRequestExecutor;
 
+///M: Support MoM checking @{
+import org.apache.http.Header;
+import org.apache.http.HttpEntityEnclosingRequest;
+import org.apache.http.HttpStatus;
+import org.apache.http.HttpVersion;
+import org.apache.http.RequestLine;
+import org.apache.http.StatusLine;
+import org.apache.http.client.methods.HttpPost;
+import org.apache.http.client.methods.HttpPut;
+import org.apache.http.entity.ByteArrayEntity;
+import org.apache.http.message.BasicHttpResponse;
+import org.apache.http.message.BasicStatusLine;
+import org.apache.http.params.HttpProtocolParams;
+import org.apache.http.protocol.HTTP;
+import org.apache.http.util.EncodingUtils;
+
+import java.io.InputStream;
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
+import java.util.zip.GZIPInputStream;
+///@}
+
+
 /**
  * Convenience base class for HTTP client implementations.
  *
@@ -99,7 +127,7 @@ public abstract class AbstractHttpClient implements HttpClient {
 
     /** The connection re-use strategy. */
     private ConnectionReuseStrategy reuseStrategy;
-    
+
     /** The connection keep-alive strategy. */
     private ConnectionKeepAliveStrategy keepAliveStrategy;
 
@@ -108,7 +136,7 @@ public abstract class AbstractHttpClient implements HttpClient {
 
     /** The authentication scheme registry. */
     private AuthSchemeRegistry supportedAuthSchemes;
-    
+
     /** The HTTP processor. */
     private BasicHttpProcessor httpProcessor;
 
@@ -129,7 +157,7 @@ public abstract class AbstractHttpClient implements HttpClient {
 
     /** The credentials provider. */
     private CredentialsProvider credsProvider;
-    
+
     /** The route planner. */
     private HttpRoutePlanner routePlanner;
 
@@ -152,10 +180,10 @@ public abstract class AbstractHttpClient implements HttpClient {
 
     protected abstract HttpParams createHttpParams();
 
-    
+
     protected abstract HttpContext createHttpContext();
 
-    
+
     protected abstract HttpRequestExecutor createRequestExecutor();
 
 
@@ -164,43 +192,43 @@ public abstract class AbstractHttpClient implements HttpClient {
 
     protected abstract AuthSchemeRegistry createAuthSchemeRegistry();
 
-    
+
     protected abstract CookieSpecRegistry createCookieSpecRegistry();
 
-    
+
     protected abstract ConnectionReuseStrategy createConnectionReuseStrategy();
 
-    
+
     protected abstract ConnectionKeepAliveStrategy createConnectionKeepAliveStrategy();
 
-    
+
     protected abstract BasicHttpProcessor createHttpProcessor();
 
-    
+
     protected abstract HttpRequestRetryHandler createHttpRequestRetryHandler();
 
-    
+
     protected abstract RedirectHandler createRedirectHandler();
 
-    
+
     protected abstract AuthenticationHandler createTargetAuthenticationHandler();
 
-    
+
     protected abstract AuthenticationHandler createProxyAuthenticationHandler();
 
-    
+
     protected abstract CookieStore createCookieStore();
-    
-    
+
+
     protected abstract CredentialsProvider createCredentialsProvider();
-    
-    
+
+
     protected abstract HttpRoutePlanner createHttpRoutePlanner();
 
-    
+
     protected abstract UserTokenHandler createUserTokenHandler();
 
-    
+
     // non-javadoc, see interface HttpClient
     public synchronized final HttpParams getParams() {
         if (defaultParams == null) {
@@ -262,7 +290,7 @@ public abstract class AbstractHttpClient implements HttpClient {
         supportedCookieSpecs = cookieSpecRegistry;
     }
 
-    
+
     public synchronized final ConnectionReuseStrategy getConnectionReuseStrategy() {
         if (reuseStrategy == null) {
             reuseStrategy = createConnectionReuseStrategy();
@@ -275,7 +303,7 @@ public abstract class AbstractHttpClient implements HttpClient {
         this.reuseStrategy = reuseStrategy;
     }
 
-    
+
     public synchronized final ConnectionKeepAliveStrategy getConnectionKeepAliveStrategy() {
         if (keepAliveStrategy == null) {
             keepAliveStrategy = createConnectionKeepAliveStrategy();
@@ -283,7 +311,7 @@ public abstract class AbstractHttpClient implements HttpClient {
         return keepAliveStrategy;
     }
 
-    
+
     public synchronized void setKeepAliveStrategy(final ConnectionKeepAliveStrategy keepAliveStrategy) {
         this.keepAliveStrategy = keepAliveStrategy;
     }
@@ -380,8 +408,8 @@ public abstract class AbstractHttpClient implements HttpClient {
     public synchronized void setRoutePlanner(final HttpRoutePlanner routePlanner) {
         this.routePlanner = routePlanner;
     }
-    
-    
+
+
     public synchronized final UserTokenHandler getUserTokenHandler() {
         if (this.userTokenHandler == null) {
             this.userTokenHandler = createUserTokenHandler();
@@ -393,8 +421,8 @@ public abstract class AbstractHttpClient implements HttpClient {
     public synchronized void setUserTokenHandler(final UserTokenHandler userTokenHandler) {
         this.userTokenHandler = userTokenHandler;
     }
-    
-    
+
+
     protected synchronized final BasicHttpProcessor getHttpProcessor() {
         if (httpProcessor == null) {
             httpProcessor = createHttpProcessor();
@@ -432,7 +460,7 @@ public abstract class AbstractHttpClient implements HttpClient {
         getHttpProcessor().removeResponseInterceptorByClass(clazz);
     }
 
-    
+
     public synchronized void addRequestInterceptor(final HttpRequestInterceptor itcp) {
         getHttpProcessor().addInterceptor(itcp);
     }
@@ -529,8 +557,8 @@ public abstract class AbstractHttpClient implements HttpClient {
 
         HttpContext execContext = null;
         RequestDirector director = null;
-        
-        // Initialize the request execution context making copies of 
+
+        // Initialize the request execution context making copies of
         // all shared objects that are potentially threading unsafe.
         synchronized (this) {
 
@@ -557,13 +585,26 @@ public abstract class AbstractHttpClient implements HttpClient {
         }
 
         try {
+            ///M: Support Mom Check @{
+            if (isMoMMS(request)) {
+                if (!enforceCheckPermission("com.mediatek.permission.CTA_SEND_MMS", "Send MMS")) {
+                    System.out.println("Fail to send due to user permission");
+                    return getBadHttpResponse();
+                }
+            } else if (isEmailSend(request)) {
+                if (!enforceCheckPermission("com.mediatek.permission.CTA_SEND_EMAIL", "Send emails")) {
+                    System.out.println("Fail to send due to user permission");
+                    return getBadHttpResponse();
+                }
+            }
+            ///@}
             return director.execute(target, request, execContext);
         } catch(HttpException httpException) {
             throw new ClientProtocolException(httpException);
         }
     } // execute
 
-    
+
     protected RequestDirector createClientRequestDirector(
             final HttpRequestExecutor requestExec,
             final ClientConnectionManager conman,
@@ -615,8 +656,8 @@ public abstract class AbstractHttpClient implements HttpClient {
 
     // non-javadoc, see interface HttpClient
     public <T> T execute(
-            final HttpUriRequest request, 
-            final ResponseHandler<? extends T> responseHandler) 
+            final HttpUriRequest request,
+            final ResponseHandler<? extends T> responseHandler)
                 throws IOException, ClientProtocolException {
         return execute(request, responseHandler, null);
     }
@@ -625,7 +666,7 @@ public abstract class AbstractHttpClient implements HttpClient {
     // non-javadoc, see interface HttpClient
     public <T> T execute(
             final HttpUriRequest request,
-            final ResponseHandler<? extends T> responseHandler, 
+            final ResponseHandler<? extends T> responseHandler,
             final HttpContext context)
                 throws IOException, ClientProtocolException {
         HttpHost target = determineTarget(request);
@@ -635,9 +676,9 @@ public abstract class AbstractHttpClient implements HttpClient {
 
     // non-javadoc, see interface HttpClient
     public <T> T execute(
-            final HttpHost target, 
+            final HttpHost target,
             final HttpRequest request,
-            final ResponseHandler<? extends T> responseHandler) 
+            final ResponseHandler<? extends T> responseHandler)
                 throws IOException, ClientProtocolException {
         return execute(target, request, responseHandler, null);
     }
@@ -645,10 +686,10 @@ public abstract class AbstractHttpClient implements HttpClient {
 
     // non-javadoc, see interface HttpClient
     public <T> T execute(
-            final HttpHost target, 
+            final HttpHost target,
             final HttpRequest request,
-            final ResponseHandler<? extends T> responseHandler, 
-            final HttpContext context) 
+            final ResponseHandler<? extends T> responseHandler,
+            final HttpContext context)
                 throws IOException, ClientProtocolException {
         if (responseHandler == null) {
             throw new IllegalArgumentException
@@ -683,7 +724,7 @@ public abstract class AbstractHttpClient implements HttpClient {
             if (t instanceof IOException) {
                 throw (IOException) t;
             }
-            
+
             throw new UndeclaredThrowableException(t);
         }
 
@@ -698,5 +739,188 @@ public abstract class AbstractHttpClient implements HttpClient {
         return result;
     }
 
+
+    /**
+    * M: Support MoM MMS checking.
+    * @hide
+    */
+    private boolean isMoMMS(HttpRequest request) {
+        final String mimetype = "application/vnd.wap.mms-message";
+        RequestLine reqLine = request.getRequestLine();
+
+        if (reqLine.getMethod().equals(HttpPost.METHOD_NAME)) {
+
+            /* For debugging purpose
+            Header[] hs = request.getAllHeaders();
+            for (Header h : hs){
+                System.out.println(h.getName() + ":" + h.getValue());
+            }
+            */
+
+            String userAgent = HttpProtocolParams.getUserAgent(defaultParams);
+            if (userAgent != null && userAgent.indexOf("MMS") != -1) {
+                return isMmsSendPdu(request);
+            } else {
+                if (request instanceof HttpEntityEnclosingRequest) {
+
+                    HttpEntity entity = ((HttpEntityEnclosingRequest) request).getEntity();
+                    if (entity != null) {
+                        Header httpHeader = entity.getContentType();
+                        if (httpHeader != null && httpHeader.getValue() != null) {
+                            if (httpHeader.getValue().startsWith(mimetype)) {
+                                System.out.println("header done");
+                                return isMmsSendPdu(request);
+                            }
+                        }
+                    }
+
+                    Header[] headers = request.getHeaders(HTTP.CONTENT_TYPE);
+                    if (headers != null) {
+                        for (Header header : headers) {
+                            if (header.getValue().indexOf(mimetype) != -1) {
+                                System.out.println("header done");
+                                return isMmsSendPdu(request);
+                            }
+                        }
+                    }
+
+                    headers = request.getHeaders("ACCEPT");
+                    if (headers != null) {
+                        for (Header header : headers) {
+                            if (header.getValue().indexOf(mimetype) != -1) {
+                                System.out.println("header done");
+                                return isMmsSendPdu(request);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        return false;
+    }
+
+    private boolean isMmsSendPdu(HttpRequest request) {
+
+        if (request instanceof HttpEntityEnclosingRequest) {
+            System.out.println("Check isMmsSendPdu");
+            HttpEntity entity = ((HttpEntityEnclosingRequest) request).getEntity();
+            if (entity != null) {
+                InputStream nis = null;
+                byte[] buf = new byte[2];
+                int len = 0;
+
+                try {
+                    InputStream is = entity.getContent();
+                    Header contentEncoding = entity.getContentEncoding();
+                    if (contentEncoding != null
+                            && contentEncoding.getValue().equals("gzip")) {
+                        nis = new GZIPInputStream(is);
+                    } else {
+                        nis = is;
+                    }
+
+                    len = nis.read(buf);
+                    System.out.println("PDU read len:" + len);
+                    if (len == 2) {
+                        //Convert to unsigned byte
+                        System.out.println("MMS PDU Type:"
+                            + (buf[0] & 0xFF) + ":" + (buf[1] & 0xFF));
+                        //X-Mms-Message-Type: m-send-req (0x80)
+                        if ((buf[0] & 0xFF) == 0x8C && (buf[1] & 0xFF) == 0x80) {
+                            return true;
+                        }
+                    }
+                } catch (IOException e) {
+                    System.out.println("[CDS]:" + e);
+                } catch (IndexOutOfBoundsException ee) {
+                    System.out.println("[CDS]:" + ee);
+                }
+            }
+        }
+        return false;
+    }
+
+    private HttpResponse getBadHttpResponse() {
+        StatusLine statusLine = new BasicStatusLine(HttpVersion.HTTP_1_1,
+                                HttpStatus.SC_BAD_REQUEST, "Bad Request");
+        HttpResponse response = new BasicHttpResponse(statusLine);
+
+        byte[] msg = EncodingUtils.getAsciiBytes("User Permission is denied");
+        ByteArrayEntity entity = new ByteArrayEntity(msg);
+        entity.setContentType("text/plain; charset=US-ASCII");
+        response.setEntity(entity);
+
+        return response;
+    }
+
+    private boolean isEmailSend(HttpRequest request) {
+        RequestLine reqLine = request.getRequestLine();
+        final String mimetype = "application/vnd.ms-sync.wbxml";
+        System.out.println("isEmailSend:" + reqLine.getMethod());
+
+         if (reqLine.getMethod().equals(HttpPost.METHOD_NAME)
+                    || reqLine.getMethod().equals(HttpPut.METHOD_NAME)) {
+
+            // For debugging purpose
+            Header[] hs = request.getAllHeaders();
+
+            System.out.println("getAllHeaders:" + reqLine.getMethod());
+            for (Header h : hs) {
+                System.out.println("test:" + h.getName() + ":" + h.getValue());
+            }
+
+            if (request instanceof HttpEntityEnclosingRequest) {
+
+                HttpEntity entity = ((HttpEntityEnclosingRequest) request).getEntity();
+                if (entity != null) {
+                    Header httpHeader = entity.getContentType();
+                    System.out.println("httpHeader:" + httpHeader);
+                    if (httpHeader != null && httpHeader.getValue() != null) {
+                        if (httpHeader.getValue().startsWith("message/rfc822")
+                            || httpHeader.getValue().startsWith(mimetype)) {
+                            System.out.println("header done");
+                            return true;
+                        }
+                    }
+                }
+
+                Header[] headers = request.getHeaders(HTTP.CONTENT_TYPE);
+                if (headers != null) {
+                    for (Header header : headers) {
+                        if (header.getValue().startsWith("message/rfc822")
+                            || header.getValue().startsWith(mimetype)) {
+                            System.out.println("header done");
+                            return true;
+                        }
+                    }
+                }
+            }
+        }
+        return false;
+    }
+
+    /** Cached com.mediatek.cta.CtaUtils.enforceCheckPermissionMethod method. */
+    private static Method enforceCheckPermissionMethod;
+
+    private boolean enforceCheckPermission(String permission, String action) {
+        try {
+            Method method;
+            synchronized (AbstractHttpClient.class) {
+                if (enforceCheckPermissionMethod == null) {
+                    Class<?> cls = Class.forName("com.mediatek.cta.CtaUtils");
+                    enforceCheckPermissionMethod =
+                            cls.getMethod("enforceCheckPermission", String.class, String.class);
+                }
+                method = enforceCheckPermissionMethod;
+            }
+            return (Boolean) method.invoke(null, permission, action);
+        } catch (ReflectiveOperationException e) {
+            if (e.getCause() instanceof SecurityException) {
+                throw new SecurityException(e.getCause());
+            }
+        }
+        return true;
+    }
 
 } // class AbstractHttpClient

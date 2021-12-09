@@ -1,4 +1,9 @@
 /*
+* Copyright (C) 2014 MediaTek Inc.
+* Modification based on code covered by the mentioned copyright
+* and/or permission notice(s).
+*/
+/*
  * $HeadURL: http://svn.apache.org/repos/asf/httpcomponents/httpclient/trunk/module-client/src/main/java/org/apache/http/impl/client/DefaultHttpRequestRetryHandler.java $
  * $Revision: 652726 $
  * $Date: 2008-05-01 18:16:51 -0700 (Thu, 01 May 2008) $
@@ -84,6 +89,10 @@ public class DefaultHttpRequestRetryHandler implements HttpRequestRetryHandler {
             final IOException exception, 
             int executionCount,
             final HttpContext context) {
+
+        /** M: print the retry count */
+        System.out.println("retry" + executionCount);
+
         if (exception == null) {
             throw new IllegalArgumentException("Exception parameter may not be null");
         }

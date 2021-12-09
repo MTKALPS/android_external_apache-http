@@ -83,7 +83,7 @@ public class DefaultClientConnection extends SocketHttpClientConnection
 
     /** Whether this connection is secure. */
     private boolean connSecure;
-    
+
     /** True if this connection was shutdown. */
     private volatile boolean shutdown;
 
@@ -111,11 +111,11 @@ public class DefaultClientConnection extends SocketHttpClientConnection
 
 
     public void opening(Socket sock, HttpHost target) throws IOException {
-        assertNotOpen();        
+        assertNotOpen();
         this.socket = sock;
         this.targetHost = target;
-        
-        // Check for shutdown after assigning socket, so that 
+
+        // Check for shutdown after assigning socket, so that
         if (this.shutdown) {
             sock.close(); // allow this to throw...
             // ...but if it doesn't, explicitly throw one ourselves.
@@ -123,7 +123,7 @@ public class DefaultClientConnection extends SocketHttpClientConnection
         }
     }
 
-    
+
     public void openCompleted(boolean secure, HttpParams params) throws IOException {
         assertNotOpen();
         if (params == null) {
@@ -132,15 +132,27 @@ public class DefaultClientConnection extends SocketHttpClientConnection
         }
         this.connSecure = secure;
         bind(this.socket, params);
+
+        ///M: HTTP OTA message logging
+        try {
+            java.net.InetAddress localAddr = this.socket.getLocalAddress();
+            java.net.InetAddress remoteAddr = this.socket.getInetAddress();
+            wireLog.debug("-- \"" + localAddr.getHostAddress() + ":"
+                    + this.socket.getLocalPort() + ";"
+                    + remoteAddr.getHostAddress() + ":"
+                    + this.socket.getPort() + "\"");
+        } catch (Exception e) {
+            System.out.println(e.getMessage());
+        }
     }
 
     /**
      * Force-closes this connection.
-     * If the connection is still in the process of being open (the method 
-     * {@link #opening opening} was already called but 
-     * {@link #openCompleted openCompleted} was not), the associated 
-     * socket that is being connected to a remote address will be closed. 
-     * That will interrupt a thread that is blocked on connecting 
+     * If the connection is still in the process of being open (the method
+     * {@link #opening opening} was already called but
+     * {@link #openCompleted openCompleted} was not), the associated
+     * socket that is being connected to a remote address will be closed.
+     * That will interrupt a thread that is blocked on connecting
      * the socket.
      * If the connection is not yet open, this will prevent the connection
      * from being opened.
@@ -151,15 +163,15 @@ public class DefaultClientConnection extends SocketHttpClientConnection
     public void shutdown() throws IOException {
         log.debug("Connection shut down");
         shutdown = true;
-        
-        super.shutdown();        
+
+        super.shutdown();
         Socket sock = this.socket; // copy volatile attribute
         if (sock != null)
             sock.close();
 
     } // shutdown
 
-    
+
     @Override
     public void close() throws IOException {
         log.debug("Connection closed");
@@ -173,7 +185,7 @@ public class DefaultClientConnection extends SocketHttpClientConnection
             int buffersize,
             final HttpParams params) throws IOException {
         SessionInputBuffer inbuffer = super.createSessionInputBuffer(
-                socket, 
+                socket,
                 buffersize,
                 params);
         if (wireLog.isDebugEnabled()) {
@@ -182,7 +194,7 @@ public class DefaultClientConnection extends SocketHttpClientConnection
         return inbuffer;
     }
 
-    
+
     @Override
     protected SessionOutputBuffer createSessionOutputBuffer(
             final Socket socket,
@@ -198,11 +210,11 @@ public class DefaultClientConnection extends SocketHttpClientConnection
         return outbuffer;
     }
 
-    
+
     @Override
     protected HttpMessageParser createResponseParser(
             final SessionInputBuffer buffer,
-            final HttpResponseFactory responseFactory, 
+            final HttpResponseFactory responseFactory,
             final HttpParams params) {
         // override in derived class to specify a line parser
         return new DefaultResponseParser

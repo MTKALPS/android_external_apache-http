@@ -1,4 +1,9 @@
 /*
+* Copyright (C) 2014 MediaTek Inc.
+* Modification based on code covered by the mentioned copyright
+* and/or permission notice(s).
+*/
+/*
  * $HeadURL: http://svn.apache.org/repos/asf/httpcomponents/httpclient/trunk/module-client/src/main/java/org/apache/http/impl/conn/DefaultClientConnectionOperator.java $
  * $Revision: 652193 $
  * $Date: 2008-04-29 17:10:36 -0700 (Tue, 29 Apr 2008) $
@@ -141,7 +146,13 @@ public class DefaultClientConnectionOperator
         }
         InetAddress[] addresses = InetAddress.getAllByName(target.getHostName());
 
-        for (int i = 0; i < addresses.length; ++i) {
+        ///M: configure the maximum connect time to avoid block app behavior @{
+        System.out.println("openConnection:" + addresses.length);
+        int retryCounter = (addresses.length <= 3) ? addresses.length : 3;
+        //@}
+
+        for (int i = 0; i < retryCounter; ++i) {
+
             Socket sock = plain_sf.createSocket();
             conn.opening(sock, target);
 
@@ -182,7 +193,7 @@ public class DefaultClientConnectionOperator
             // BEGIN android-changed
             //       catch SocketException to cover any kind of connect failure
             } catch (SocketException ex) {
-                if (i == addresses.length - 1) {
+                if (i == retryCounter - 1) {
                     final ConnectException cause;
                     if (ex instanceof ConnectException) {
                         cause = (ConnectException) ex;
@@ -194,7 +205,7 @@ public class DefaultClientConnectionOperator
                 }
             // END android-changed
             } catch (ConnectTimeoutException ex) {
-                if (i == addresses.length - 1) {
+                if (i == retryCounter - 1) {
                     throw ex;
                 }
             }
@@ -258,6 +269,7 @@ public class DefaultClientConnectionOperator
      * @param params    the parameters from which to prepare the socket
      *
      * @throws IOException      in case of an IO problem
+     * M: Support snd timer socket option in java
      */
     protected void prepareSocket(Socket sock, HttpContext context,
                                  HttpParams params)
@@ -269,9 +281,11 @@ public class DefaultClientConnectionOperator
         sock.setTcpNoDelay(HttpConnectionParams.getTcpNoDelay(params));
         sock.setSoTimeout(HttpConnectionParams.getSoTimeout(params));
 
+        /** M: Support snd timer socket option in java */
+        //sock.setSoSndTimeout(HttpConnectionParams.getSoSndTimeout(params));
         int linger = HttpConnectionParams.getLinger(params);
         if (linger >= 0) {
-            sock.setSoLinger(linger > 0, linger);
+            sock.setSoLinger(linger >= 0, linger);
         }
 
     } // prepareSocket

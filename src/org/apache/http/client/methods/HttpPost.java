@@ -1,4 +1,9 @@
 /*
+* Copyright (C) 2014 MediaTek Inc.
+* Modification based on code covered by the mentioned copyright
+* and/or permission notice(s).
+*/
+/*
  * $HeadURL: http://svn.apache.org/repos/asf/httpcomponents/httpclient/trunk/module-client/src/main/java/org/apache/http/client/methods/HttpPost.java $
  * $Revision: 664505 $
  * $Date: 2008-06-08 06:21:20 -0700 (Sun, 08 Jun 2008) $
@@ -81,6 +86,27 @@ public class HttpPost extends HttpEntityEnclosingRequestBase {
      */
     public HttpPost(final String uri) {
         super();
+
+        ///M: ALPS00612009 Fix URI null exception
+        if (uri == null) {
+            throw new IllegalArgumentException();
+        }
+
+        try {
+            Class<?> classType = Class.forName("android.os.Build");
+            String value  = (String) classType.getDeclaredField("TYPE").get(null);
+
+            if ("eng".equals(value)) {
+                System.out.println("httppost:" + uri);
+            }
+        } catch (NoSuchFieldException e) {
+            e.printStackTrace();
+        } catch (ClassNotFoundException e) {
+            e.printStackTrace();
+        } catch (IllegalAccessException e) {
+            e.printStackTrace();
+        }
+
         setURI(URI.create(uri));
     }
 

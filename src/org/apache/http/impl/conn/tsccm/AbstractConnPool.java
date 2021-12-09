@@ -1,4 +1,9 @@
 /*
+* Copyright (C) 2014 MediaTek Inc.
+* Modification based on code covered by the mentioned copyright
+* and/or permission notice(s).
+*/
+/*
  * $HeadURL: http://svn.apache.org/repos/asf/httpcomponents/httpclient/trunk/module-client/src/main/java/org/apache/http/impl/conn/tsccm/AbstractConnPool.java $
  * $Revision: 673450 $
  * $Date: 2008-07-02 10:35:05 -0700 (Wed, 02 Jul 2008) $
@@ -143,6 +148,8 @@ public abstract class AbstractConnPool implements RefQueueHandler {
         t.setDaemon(true);
         t.setName("RefQueueWorker@" + this);
         t.start();
+
+        refWorker.waitWorkerStart();
     }
 
 

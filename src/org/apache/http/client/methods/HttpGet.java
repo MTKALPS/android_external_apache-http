@@ -1,4 +1,9 @@
 /*
+* Copyright (C) 2014 MediaTek Inc.
+* Modification based on code covered by the mentioned copyright
+* and/or permission notice(s).
+*/
+/*
  * $HeadURL: http://svn.apache.org/repos/asf/httpcomponents/httpclient/trunk/module-client/src/main/java/org/apache/http/client/methods/HttpGet.java $
  * $Revision: 664505 $
  * $Date: 2008-06-08 06:21:20 -0700 (Sun, 08 Jun 2008) $
@@ -74,10 +79,32 @@ public class HttpGet extends HttpRequestBase {
 
     /**
      * @throws IllegalArgumentException if the uri is invalid. 
+     * M: Fix CR issue: ALPS00052840. AppIOT issue.
      */
     public HttpGet(final String uri) {
         super();
-        setURI(URI.create(uri));
+
+        /** M: encode space with special character '%20' @{ */
+        //Add by MTK03594 for ALPS00052840
+        String encodeUri = uri.trim();
+        encodeUri = encodeUri.replaceAll(" ", "%20");
+
+        try {
+            Class<?> classType = Class.forName("android.os.Build");
+            String value  = (String) classType.getDeclaredField("TYPE").get(null);
+
+            if ("eng".equals(value)) {
+                System.out.println("httpget:" + uri);
+            }
+        } catch (NoSuchFieldException e) {
+            e.printStackTrace();
+        } catch (ClassNotFoundException e) {
+            e.printStackTrace();
+        } catch (IllegalAccessException e) {
+            e.printStackTrace();
+        }
+        setURI(URI.create(encodeUri));
+        /** @} */
     }
 
     @Override

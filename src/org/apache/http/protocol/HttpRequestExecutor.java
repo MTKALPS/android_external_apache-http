@@ -1,4 +1,9 @@
 /*
+* Copyright (C) 2014 MediaTek Inc.
+* Modification based on code covered by the mentioned copyright
+* and/or permission notice(s).
+*/
+/*
  * $HeadURL: http://svn.apache.org/repos/asf/httpcomponents/httpcore/trunk/module-main/src/main/java/org/apache/http/protocol/HttpRequestExecutor.java $
  * $Revision: 576073 $
  * $Date: 2007-09-16 03:53:13 -0700 (Sun, 16 Sep 2007) $
@@ -33,7 +38,8 @@ package org.apache.http.protocol;
 
 import java.io.IOException;
 import java.net.ProtocolException;
-
+///M: Telcel requirements
+import java.net.Socket;
 import org.apache.http.HttpClientConnection;
 import org.apache.http.HttpEntityEnclosingRequest;
 import org.apache.http.HttpException;
@@ -43,6 +49,9 @@ import org.apache.http.HttpStatus;
 import org.apache.http.HttpVersion;
 import org.apache.http.ProtocolVersion;
 import org.apache.http.params.CoreProtocolPNames;
+
+///M: Telcel requirements
+import org.apache.http.Header;
 
 /**
  * Sends HTTP requests and receives the responses.
@@ -121,10 +130,17 @@ public class HttpRequestExecutor {
         }
 
         try {
+            /** M: debug purpose - print the log before the HTTP REQUEST is sending */
+            System.out.println(">doSendRequest");
             HttpResponse response = doSendRequest(request, conn, context);
+            /** M: debug purpose - print the log after the HTTP REQUEST is sent */
+            System.out.println("<doSendRequest");
+
             if (response == null) {
                 response = doReceiveResponse(request, conn, context);
             }
+            /** M: debug purpose - print the log after the HTTP Response is received */
+            System.out.println("<doReceiveResponse");
             return response;
         } catch (IOException ex) {
             conn.close();
@@ -287,6 +303,8 @@ public class HttpRequestExecutor {
             }
             statuscode = response.getStatusLine().getStatusCode();
 
+            ///M: Support Telcel Requirement @{
+            checkPrepaidAction(statuscode, response);
         } // while intermediate response
 
         return response;
@@ -322,6 +340,31 @@ public class HttpRequestExecutor {
             throw new IllegalArgumentException("HTTP context may not be null");
         }
         processor.process(response, context);
+    }
+
+    private void checkPrepaidAction(int statusCode, HttpResponse response) {
+        try {
+            if (statusCode == HttpStatus.SC_MOVED_TEMPORARILY ||
+                statusCode == HttpStatus.SC_MOVED_PERMANENTLY ||
+                statusCode == HttpStatus.SC_SEE_OTHER ||
+                statusCode == HttpStatus.SC_TEMPORARY_REDIRECT) {
+
+                Header locationHeader = response.getFirstHeader("location");
+                if (locationHeader != null) {
+                    String location = locationHeader.getValue();
+                    //Socket.notifyHttpRedirect(location);
+            try {
+            Class.forName("java.net.Socket")
+                   .getMethod("notifyHttpRedirect", String.class).invoke(null, location);
+            } catch (Exception e) {
+            e.printStackTrace();
+            System.out.println(e);
+            }
+            }
+            }
+        } catch (Exception e) {
+            System.out.println("err:" + e);
+        }
     }
 
 } // class HttpRequestExecutor

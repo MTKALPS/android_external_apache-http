@@ -1,4 +1,9 @@
 /*
+* Copyright (C) 2014 MediaTek Inc.
+* Modification based on code covered by the mentioned copyright
+* and/or permission notice(s).
+*/
+/*
  * $HeadURL: http://svn.apache.org/repos/asf/httpcomponents/httpcore/trunk/module-main/src/main/java/org/apache/http/impl/SocketHttpClientConnection.java $
  * $Revision: 561083 $
  * $Date: 2007-07-30 11:31:17 -0700 (Mon, 30 Jul 2007) $
@@ -107,6 +112,18 @@ public class SocketHttpClientConnection
         this.socket = socket;
 
         int buffersize = HttpConnectionParams.getSocketBufferSize(params);
+
+        ///M: Configure TCP buffer size @{
+        if (buffersize > 0) {
+            System.out.println("buffer size:" + buffersize);
+            socket.setSendBufferSize(buffersize);
+            String rxBufferSize = System.getProperty("socket.rx.buffer.size", "");
+            System.out.println("rxBufferSize size:" + rxBufferSize);
+            if (rxBufferSize.length() != 0) {
+                socket.setReceiveBufferSize(buffersize);
+            }
+        }
+        ///@}
 
         init(
                 createSessionInputBuffer(socket, buffersize, params), 
