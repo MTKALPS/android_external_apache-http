@@ -143,6 +143,8 @@ public abstract class AbstractConnPool implements RefQueueHandler {
         t.setDaemon(true);
         t.setName("RefQueueWorker@" + this);
         t.start();
+
+        refWorker.waitWorkerStart();
     }
 
 

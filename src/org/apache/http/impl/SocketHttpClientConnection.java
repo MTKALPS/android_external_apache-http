@@ -108,6 +108,18 @@ public class SocketHttpClientConnection
 
         int buffersize = HttpConnectionParams.getSocketBufferSize(params);
 
+        ///M: Configure TCP buffer size @{
+        if (buffersize > 0) {
+            System.out.println("buffer size:" + buffersize);
+            socket.setSendBufferSize(buffersize);
+            String rxBufferSize = System.getProperty("socket.rx.buffer.size", "");
+            System.out.println("rxBufferSize size:" + rxBufferSize);
+            if (rxBufferSize.length() != 0) {
+                socket.setReceiveBufferSize(buffersize);
+            }
+        }
+        ///@}
+
         init(
                 createSessionInputBuffer(socket, buffersize, params), 
                 createSessionOutputBuffer(socket, buffersize, params),

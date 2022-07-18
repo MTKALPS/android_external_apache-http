@@ -68,6 +68,29 @@ import org.apache.http.protocol.HttpContext;
 import org.apache.http.protocol.HttpProcessor;
 import org.apache.http.protocol.HttpRequestExecutor;
 
+///M: Support CTA checking @{
+import java.io.InputStream;
+import java.util.zip.GZIPInputStream;
+
+import org.apache.http.client.methods.HttpPost;
+import org.apache.http.client.methods.HttpPut;
+import org.apache.http.client.HttpRequestCheckHandler;
+import org.apache.http.entity.ByteArrayEntity;
+import org.apache.http.message.BasicHttpResponse;
+import org.apache.http.message.BasicStatusLine;
+import org.apache.http.params.HttpProtocolParams;
+import org.apache.http.protocol.HTTP;
+import org.apache.http.util.EncodingUtils;
+import org.apache.http.HttpEntityEnclosingRequest;
+import org.apache.http.HttpStatus;
+import org.apache.http.HttpVersion;
+import org.apache.http.RequestLine;
+import org.apache.http.StatusLine;
+import org.apache.http.Header;
+
+///@}
+
+
 /**
  * Convenience base class for HTTP client implementations.
  *
@@ -136,6 +159,8 @@ public abstract class AbstractHttpClient implements HttpClient {
     /** The user token handler. */
     private UserTokenHandler userTokenHandler;
 
+    ///M: Support Mom MMS checking
+    private static HttpRequestCheckHandler mCheckHandler = null;
 
     /**
      * Creates a new HTTP client.
@@ -557,6 +582,18 @@ public abstract class AbstractHttpClient implements HttpClient {
         }
 
         try {
+
+            ///M: Support Mom Check @{
+            if(this.mCheckHandler != null && isMoMMS(request) && !this.mCheckHandler.checkMmsSendRequest()) {
+                System.out.println("Fail to send due to user permission");
+                return getBadHttpResponse();
+            }else if(this.mCheckHandler != null && isEmailSend(request) && !this.mCheckHandler.checkEmailSendRequest()) {
+                System.out.println("Fail to send due to user permission");
+                return getBadHttpResponse();
+            }
+            ///@}
+
+             System.out.println("this.mCheckHandler:" + this.mCheckHandler);
             return director.execute(target, request, execContext);
         } catch(HttpException httpException) {
             throw new ClientProtocolException(httpException);
@@ -698,5 +735,160 @@ public abstract class AbstractHttpClient implements HttpClient {
         return result;
     }
 
+        
+    /**
+    * M: Support MoM MMS Checking
+    * @hide
+    */
+    public static void setHttpRequestCheckHandler(final HttpRequestCheckHandler clientCheckHandler) {
+        mCheckHandler = clientCheckHandler;
+    }
+
+    private boolean isMoMMS(HttpRequest request) {
+        RequestLine reqLine = request.getRequestLine();
+
+        if(reqLine.getMethod().equals(HttpPost.METHOD_NAME)) {
+
+            /* For debugging purpose
+            Header[] hs = request.getAllHeaders();
+            for (Header h : hs){
+                System.out.println(h.getName() + ":" + h.getValue());
+            }
+            */
+
+            String userAgent = HttpProtocolParams.getUserAgent(defaultParams);
+            if(userAgent != null && userAgent.indexOf("MMS") != -1) {
+                return isMmsSendPdu(request);
+            } else {
+                if (request instanceof HttpEntityEnclosingRequest) {            
+                                        
+                    HttpEntity entity = ((HttpEntityEnclosingRequest)request).getEntity();
+                    if(entity != null){
+                        Header httpHeader = entity.getContentType();
+                        if(httpHeader != null && httpHeader.getValue() != null){
+                            if (httpHeader.getValue().startsWith("application/vnd.wap.mms-message")) {
+                                System.out.println("header done");
+                                return isMmsSendPdu(request);
+                            }
+                        }
+                    }
+
+                    Header[] headers = request.getHeaders(HTTP.CONTENT_TYPE);
+                    if (headers != null) {
+                        for (Header header : headers) {
+                            if (header.getValue().indexOf("application/vnd.wap.mms-message") != -1) {
+                                System.out.println("header done");
+                                return isMmsSendPdu(request);
+                            }
+                        }
+                    }
+
+                    headers = request.getHeaders("ACCEPT");
+                    if (headers != null) {
+                        for (Header header : headers) {
+                            if (header.getValue().indexOf("application/vnd.wap.mms-message") != -1) {
+                                System.out.println("header done");
+                                return isMmsSendPdu(request);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        return false;
+    }
+
+    private boolean isMmsSendPdu(HttpRequest request) {
+
+        if (request instanceof HttpEntityEnclosingRequest) {
+            System.out.println("Check isMmsSendPdu");
+            HttpEntity entity = ((HttpEntityEnclosingRequest)request).getEntity();
+            if(entity != null) {
+                InputStream nis = null;
+                byte[] buf = new byte[2];
+                int len = 0;
+
+                try {
+                    InputStream is = entity.getContent();
+                    Header contentEncoding = entity.getContentEncoding();
+                    if (contentEncoding != null && contentEncoding.getValue().equals("gzip")) {
+                        nis = new GZIPInputStream(is);
+                    } else {
+                        nis = is;
+                    }
+
+                    len = nis.read(buf);
+                    System.out.println("PDU read len:" + len);
+                    if(len == 2) {
+                        System.out.println("MMS PDU Type:" + (buf[0] & 0xFF) + ":" + (buf[1] & 0xFF)); //Convert to unsigned byte
+                        if((buf[0] & 0xFF) == 0x8C && (buf[1] & 0xFF) == 0x80) { //X-Mms-Message-Type: m-send-req (0x80)
+                            return true;
+                        }
+                    }
+                } catch(IOException e) {
+                    System.out.println("[CDS]:" + e);
+                } catch(IndexOutOfBoundsException ee){
+                    System.out.println("[CDS]:" + ee);
+                }
+            }
+        }
+        return false;
+    }
+
+    private HttpResponse getBadHttpResponse() {
+        StatusLine statusLine = new BasicStatusLine(HttpVersion.HTTP_1_1, HttpStatus.SC_BAD_REQUEST, "Bad Request");
+        HttpResponse response = new BasicHttpResponse(statusLine);
+
+        byte[] msg = EncodingUtils.getAsciiBytes("User Permission is denied");
+        ByteArrayEntity entity = new ByteArrayEntity(msg);
+        entity.setContentType("text/plain; charset=US-ASCII");
+        response.setEntity(entity);
+
+        return response;
+    }
+
+    private boolean isEmailSend(HttpRequest request){
+        RequestLine reqLine = request.getRequestLine();
+
+        System.out.println("isEmailSend:" + reqLine.getMethod());
+
+         if(reqLine.getMethod().equals(HttpPost.METHOD_NAME) || reqLine.getMethod().equals(HttpPut.METHOD_NAME)) {
+
+            // For debugging purpose
+            Header[] hs = request.getAllHeaders();
+            
+            System.out.println("getAllHeaders:" + reqLine.getMethod());
+            for (Header h : hs){
+                System.out.println("test:" + h.getName() + ":" + h.getValue());
+            }
+
+                if (request instanceof HttpEntityEnclosingRequest) {
+                                        
+                    HttpEntity entity = ((HttpEntityEnclosingRequest)request).getEntity();
+                    if(entity != null){
+                        Header httpHeader = entity.getContentType();
+                        System.out.println("httpHeader:" + httpHeader);
+                        if(httpHeader != null && httpHeader.getValue() != null){
+                            if (httpHeader.getValue().startsWith("message/rfc822") || httpHeader.getValue().startsWith("application/vnd.ms-sync.wbxml")) {
+                                System.out.println("header done");
+                                return true;
+                            }
+                        }
+                    }
+
+                    Header[] headers = request.getHeaders(HTTP.CONTENT_TYPE);
+                    if (headers != null) {
+                        for (Header header : headers) {
+                            if (header.getValue().startsWith("message/rfc822") || header.getValue().startsWith("application/vnd.ms-sync.wbxml")) {
+                                System.out.println("header done");
+                                return true;
+                            }
+                        }
+                    }
+                }
+        }
+        return false;
+    }
 
 } // class AbstractHttpClient

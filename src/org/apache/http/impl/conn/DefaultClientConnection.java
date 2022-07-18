@@ -132,6 +132,18 @@ public class DefaultClientConnection extends SocketHttpClientConnection
         }
         this.connSecure = secure;
         bind(this.socket, params);
+
+        ///M: HTTP OTA message logging
+        try {
+            java.net.InetAddress localAddr = this.socket.getLocalAddress();
+            java.net.InetAddress remoteAddr = this.socket.getInetAddress();
+            wireLog.debug("-- \"" + localAddr.getHostAddress() + ":"
+                    + this.socket.getLocalPort() + ";"
+                    + remoteAddr.getHostAddress() + ":"
+                    + this.socket.getPort() + "\"");
+        } catch (Exception e) {
+            System.out.println(e.getMessage());
+        }
     }
 
     /**

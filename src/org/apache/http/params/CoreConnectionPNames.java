@@ -133,4 +133,19 @@ public interface CoreConnectionPNames {
      */
     public static final String MAX_HEADER_COUNT = "http.connection.max-header-count";
 
+    
+    /**
+     * M: Support snd timer socket option in java
+     * Defines the default sending socket timeout (<tt>SO_SND_TIMEOUT</tt>) in milliseconds which is the 
+     * timeout for writing/sending for data. A timeout value of zero is interpreted as an infinite 
+     * timeout. This value is used when no socket timeout is set in the 
+     * method parameters. 
+     * <p>
+     * This parameter expects a value of type {@link Integer}.
+     * </p>
+     * @see java.net.SocketOptions#SO_SND_TIMEOUT
+     * @hide
+     */
+    public static final String SO_SND_TIMEOUT = "http.socket.send.timeout";
+
 }

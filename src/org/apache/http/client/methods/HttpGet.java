@@ -74,10 +74,19 @@ public class HttpGet extends HttpRequestBase {
 
     /**
      * @throws IllegalArgumentException if the uri is invalid. 
+     * M: Fix CR issue: ALPS00052840. AppIOT issue.
      */
     public HttpGet(final String uri) {
         super();
-        setURI(URI.create(uri));
+
+        /** M: encode space with special character '%20' @{ */
+        //Add by MTK03594 for ALPS00052840
+        String encodeUri = uri.trim();
+        encodeUri = encodeUri.replaceAll(" ", "%20");
+
+        System.out.println("httpget:" + uri);
+        setURI(URI.create(encodeUri));
+        /** @} */
     }
 
     @Override

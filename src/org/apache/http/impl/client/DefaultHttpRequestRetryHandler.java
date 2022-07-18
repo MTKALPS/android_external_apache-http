@@ -84,6 +84,10 @@ public class DefaultHttpRequestRetryHandler implements HttpRequestRetryHandler {
             final IOException exception, 
             int executionCount,
             final HttpContext context) {
+
+        /** M: print the retry count */
+        System.out.println("retry" + executionCount);
+
         if (exception == null) {
             throw new IllegalArgumentException("Exception parameter may not be null");
         }

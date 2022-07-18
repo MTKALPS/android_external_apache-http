@@ -30,12 +30,18 @@
 
 package org.apache.http.impl.auth;
 
+import java.io.IOException;
 import java.security.MessageDigest;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Locale;
+import java.util.Set;
 import java.util.StringTokenizer;
 
 import org.apache.http.Header;
+import org.apache.http.HttpEntity;
+import org.apache.http.HttpEntityEnclosingRequest;
 import org.apache.http.HttpRequest;
 import org.apache.http.auth.AuthenticationException;
 import org.apache.http.auth.Credentials;
@@ -102,6 +108,7 @@ public class DigestScheme extends RFC2617Scheme {
     
     //TODO: supply a real nonce-count, currently a server will interprete a repeated request as a replay  
     private static final String NC = "00000001"; //nonce-count is always 1
+    private static final int QOP_UNKNOWN = -1;
     private static final int QOP_MISSING = 0;
     private static final int QOP_AUTH_INT = 1;
     private static final int QOP_AUTH = 2;
@@ -240,7 +247,7 @@ public class DigestScheme extends RFC2617Scheme {
             charset = AuthParams.getCredentialCharset(request.getParams());
             getParameters().put("charset", charset);
         }
-        String digest = createDigest(credentials);
+        String digest = createDigest(credentials, request);
         return createDigestHeader(credentials, digest);
     }
     
@@ -262,7 +269,8 @@ public class DigestScheme extends RFC2617Scheme {
      *         value in the Authentication HTTP header.
      * @throws AuthenticationException when MD5 is an unsupported algorithm
      */
-    private String createDigest(final Credentials credentials) throws AuthenticationException {
+    private String createDigest(final Credentials credentials, final HttpRequest request)
+            throws AuthenticationException {
         // Collecting required tokens
         String uri = getParameter("uri");
         String realm = getParameter("realm");
@@ -288,9 +296,22 @@ public class DigestScheme extends RFC2617Scheme {
             charset = "ISO-8859-1";
         }
 
-        if (qopVariant == QOP_AUTH_INT) {
-            throw new AuthenticationException(
-                "Unsupported qop in HTTP Digest authentication");   
+        final Set<String> qopset = new HashSet<String>(8);
+        int qop = QOP_UNKNOWN;
+        final String qoplist = getParameter("qop");
+        if (qoplist != null) {
+            final StringTokenizer tok = new StringTokenizer(qoplist, ",");
+            while (tok.hasMoreTokens()) {
+                final String variant = tok.nextToken().trim();
+                qopset.add(variant.toLowerCase(Locale.ENGLISH));
+            }
+            if (request instanceof HttpEntityEnclosingRequest && qopset.contains("auth-int")) {
+                qop = QOP_AUTH_INT;
+            } else if (qopset.contains("auth")) {
+                qop = QOP_AUTH;
+            }
+        } else {
+            qop = QOP_MISSING;
         }
 
         MessageDigest md5Helper = createMessageDigest("MD5");
@@ -331,9 +352,32 @@ public class DigestScheme extends RFC2617Scheme {
 
         String a2 = null;
         if (qopVariant == QOP_AUTH_INT) {
-            // Unhandled qop auth-int
-            //we do not have access to the entity-body or its hash
-            //TODO: add Method ":" digest-uri-value ":" H(entity-body)      
+            // Method ":" digest-uri-value ":" H(entity-body)
+            HttpEntity entity = null;
+            if (request instanceof HttpEntityEnclosingRequest) {
+                entity = ((HttpEntityEnclosingRequest) request).getEntity();
+            }
+            if (entity != null && !entity.isRepeatable()) {
+                // If the entity is not repeatable, try falling back onto QOP_AUTH
+                if (qopset.contains("auth")) {
+                    qop = QOP_AUTH;
+                    a2 = method + ':' + uri;
+                } else {
+                    throw new AuthenticationException("Qop auth-int cannot be used with " +
+                            "a non-repeatable entity");
+                }
+            } else {
+                final HttpEntityDigester entityDigester = new HttpEntityDigester(md5Helper);
+                try {
+                    if (entity != null) {
+                        entity.writeTo(entityDigester);
+                    }
+                    entityDigester.close();
+                } catch (final IOException ex) {
+                    throw new AuthenticationException("I/O error reading entity content", ex);
+                }
+                a2 = method + ':' + uri + ':' + encode(entityDigester.getDigest());
+            }
         } else {
             a2 = method + ':' + uri;
         }
@@ -429,7 +473,8 @@ public class DigestScheme extends RFC2617Scheme {
                 buffer.append(", ");
             }
             boolean noQuotes = "nc".equals(param.getName()) ||
-                               "qop".equals(param.getName());
+                               "qop".equals(param.getName())||
+                               "algorithm".equals(param.getName());
             BasicHeaderValueFormatter.DEFAULT
                 .formatNameValuePair(buffer, param, !noQuotes);
         }

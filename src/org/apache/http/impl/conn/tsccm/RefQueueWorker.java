@@ -62,6 +62,10 @@ public class RefQueueWorker implements Runnable {
     /** The handler for the references found. */
     protected final RefQueueHandler refHandler;
 
+    ///M: Fix race condition issue {@
+    private boolean mRunFlag = false;
+    private Object  mMutex = "RefQueueWorker";
+    /// @}
 
     /**
      * The thread executing this handler.
@@ -101,6 +105,14 @@ public class RefQueueWorker implements Runnable {
             this.workerThread = Thread.currentThread();
         }
 
+
+        ///M: Fix race condition issue {@
+        synchronized (mMutex) {
+            this.mRunFlag = true;
+            mMutex.notify();
+        }
+        /// @}
+
         while (this.workerThread == Thread.currentThread()) {
             try {
                 // remove the next reference and process it
@@ -139,6 +151,26 @@ public class RefQueueWorker implements Runnable {
     public String toString() {
         return "RefQueueWorker::" + this.workerThread;
     }
+
+    ///M: Fix race condition issue {@
+    /**
+     * Wait for RefQueueWorker thread ready to run.
+     *
+     * @hide
+     */
+    public void waitWorkerStart() {
+        synchronized (mMutex) {
+            while (this.mRunFlag != true) {
+                try {
+                    //Add guard timer for avoid deadlock in some scenarios.
+                    mMutex.wait(3 * 1000);
+                } catch (InterruptedException e) {
+                    System.out.println("err:" + e);
+                }
+            }
+        }
+    }
+    /// @}
 
 } // class RefQueueWorker
 

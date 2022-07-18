@@ -17,13 +17,21 @@
 
 package org.apache.commons.logging.impl;
 
-
 import java.io.Serializable;
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import org.apache.commons.logging.Log;
 
+import java.io.File;
+import java.io.IOException;
+import java.text.SimpleDateFormat;
+import java.util.Date;
+import java.util.logging.FileHandler;
+import java.util.logging.Formatter;
+import java.util.logging.LogRecord;
 
 /**
  * <p>Implementation of the <code>org.apache.commons.logging.Log</code>
@@ -51,8 +59,44 @@ public class Jdk14Logger implements Log, Serializable {
      */
     protected static final Level dummyLevel = Level.FINE;
 
+    protected static int sLogLevel = 0;
+
     // ----------------------------------------------------------- Constructors
 
+    ///M: Support log to file.
+
+    /**
+      * Class for log foramt of file name
+      */
+    private class HttpSimpleFormatter extends Formatter {
+
+        HttpSimpleFormatter() {
+            super();
+        }
+
+        /**
+         * Converts a {@link LogRecord} object into a human readable string
+         * representation.
+         *
+         * @param r
+         *            the log record to be formatted into a string.
+         * @return the formatted string.
+         */
+        @Override
+        public String format(LogRecord r) {
+            StringBuilder sb = new StringBuilder();
+            SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd:HH-mm-ss");
+            Date date = new Date(r.getMillis());
+            sb.append(dateFormat.format(date)).append(" ");
+            sb.append(String.valueOf(r.getMillis())).append(" ");
+            sb.append("http").append(" ");
+            sb.append(r.getThreadID()).append(" ");
+            sb.append(formatMessage(r)).append(System.lineSeparator());
+            return sb.toString();
+        }
+
+
+    }
 
     /**
      * Construct a named instance of this Logger.
@@ -64,6 +108,54 @@ public class Jdk14Logger implements Log, Serializable {
         this.name = name;
         logger = getLogger();
 
+        ///M: Support http log controlled by Android SystemProperties @{
+        try {
+            Class<?> classType = Class.forName("android.os.SystemProperties");
+            Method getIntMethod  = classType.getDeclaredMethod("getInt", String.class, int.class);
+            Integer v = (Integer) getIntMethod.invoke(classType, "net.httplog.level", 0);
+            sLogLevel = v.intValue();
+
+            if (sLogLevel == 2 && name.indexOf("org.apache.http.wire") != -1) {
+                configLogFile();
+            }
+        } catch (ClassNotFoundException c) {
+            System.out.println("error:" + c.getMessage());
+        } catch (NoSuchMethodException ie) {
+            System.out.println("error:" + ie.getMessage());
+        } catch (InvocationTargetException iee) {
+            System.out.println("error:" + iee.getMessage());
+        } catch (IllegalAccessException iae) {
+            System.out.println("error:" + iae.getMessage());
+        }
+        ///@}
+    }
+
+    ///M: HTTP OTA message logging
+    private void configLogFile() {
+        try {
+            FileHandler fh;
+            Date date = new Date() ;
+            SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd-HH-mm-ss");
+            Thread t = Thread.currentThread();
+
+            File folder = new File("/data/http");
+            if (!folder.isDirectory()) {
+                folder.mkdir();
+            }
+
+            //String filePath = "http_" + dateFormat.format(date) + ".log";
+            String filePath = "%thttp.log";
+            String tempPath = System.getProperty("java.io.tmpdir");
+            System.out.println("http log file path:" + tempPath + ":" + filePath);
+
+            fh = new FileHandler(filePath, true);
+            fh.setFormatter(new HttpSimpleFormatter());
+            logger.addHandler(fh);
+        } catch (SecurityException e) {
+            System.out.println("error:" + e.getMessage());
+        } catch (IOException ioe) {
+            System.out.println("error:" + ioe.getMessage());
+        }
     }
 
 
@@ -100,6 +192,19 @@ public class Jdk14Logger implements Log, Serializable {
                 method=caller.getMethodName();
             }
             if( ex==null ) {
+                ///M: Dyamic http logging @{
+                if (sLogLevel == 1) {
+                    if (name.indexOf("org.apache.http.headers") != -1) {
+                        System.out.println(name + ":" + method + ":" + msg);
+                    }
+                } else if (sLogLevel == 2) {
+                    if (name.indexOf("org.apache.http.wire") != -1) {
+                        System.out.println(name + ":" + method + ":" + msg);
+                    }
+                } else if (sLogLevel == 3) {
+                    System.out.println(name + ":" + method + ":" + msg);
+                }
+                //@}
                 logger.logp( level, cname, method, msg );
             } else {
                 logger.logp( level, cname, method, msg, ex );
@@ -184,6 +289,13 @@ public class Jdk14Logger implements Log, Serializable {
         if (logger == null) {
             logger = Logger.getLogger(name);
         }
+
+        ///M: Dymaic debug logging @{
+        if (sLogLevel > 0) {
+            logger.setLevel(Level.ALL);
+        }
+        //@}
+
         return (logger);
     }
 

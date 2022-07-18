@@ -226,4 +226,41 @@ public final class HttpConnectionParams implements CoreConnectionPNames {
             (CoreConnectionPNames.STALE_CONNECTION_CHECK, value);
     }
     
+    
+    /**
+     * Support snd timer socket option in java
+     * Returns the default socket timeout (<tt>SO_SND_TIMEOUT</tt>) in milliseconds which is the 
+     * timeout for writing/send to data. A timeout value of zero is interpreted as an infinite 
+     * timeout. This value is used when no socket timeout is set in the 
+     * method parameters. 
+     * @hide
+     * @return timeout in milliseconds
+     */
+    public static int getSoSndTimeout(final HttpParams params) {
+        if (params == null) {
+            throw new IllegalArgumentException("HTTP parameters may not be null");
+        }
+        return params.getIntParameter(CoreConnectionPNames.SO_SND_TIMEOUT, 0);
+    }
+    
+    //M: Add by MTK03594 for ALPS00076216
+    /**
+     * Support snd timer socket option in java
+     * Sets the default socket timeout (<tt>SO_SND_TIMEOUT</tt>) in milliseconds which is the 
+     * timeout for writing/send to data. A timeout value of zero is interpreted as an infinite 
+     * timeout. This value is used when no socket timeout is set in the 
+     * method parameters. 
+     *
+     * @param timeout Timeout in milliseconds
+     * @hide
+     * @internal
+     */
+    public static void setSoSndTimeout(final HttpParams params, int timeout) {
+        if (params == null) {
+            throw new IllegalArgumentException("HTTP parameters may not be null");
+        }
+        params.setIntParameter(CoreConnectionPNames.SO_SND_TIMEOUT, timeout);
+        
+    }
+
 }

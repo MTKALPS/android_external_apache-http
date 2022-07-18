@@ -141,7 +141,21 @@ public class DefaultClientConnectionOperator
         }
         InetAddress[] addresses = InetAddress.getAllByName(target.getHostName());
 
+        ///M: configure the maximum connect time to avoid block app behavior @{
+        System.out.println("openConnection:" + addresses.length);
+        long stopTime = System.currentTimeMillis() + 5 * 60 * 1000; 
+        //@}
+
         for (int i = 0; i < addresses.length; ++i) {
+
+            ///M: configure the maximum connect time to avoid block app behavior @{
+            if(i > 2){
+                if(System.currentTimeMillis() > stopTime){
+                    throw new ConnectTimeoutException();
+                }
+            }
+            //@}
+
             Socket sock = plain_sf.createSocket();
             conn.opening(sock, target);
 
@@ -253,6 +267,7 @@ public class DefaultClientConnectionOperator
      * @param params    the parameters from which to prepare the socket
      *
      * @throws IOException      in case of an IO problem
+     * M: Support snd timer socket option in java
      */
     protected void prepareSocket(Socket sock, HttpContext context,
                                  HttpParams params)
@@ -264,9 +279,11 @@ public class DefaultClientConnectionOperator
         sock.setTcpNoDelay(HttpConnectionParams.getTcpNoDelay(params));
         sock.setSoTimeout(HttpConnectionParams.getSoTimeout(params));
 
+        /** M: Support snd timer socket option in java */
+        sock.setSoSndTimeout(HttpConnectionParams.getSoSndTimeout(params));
         int linger = HttpConnectionParams.getLinger(params);
         if (linger >= 0) {
-            sock.setSoLinger(linger > 0, linger);
+            sock.setSoLinger(linger >= 0, linger);
         }
 
     } // prepareSocket

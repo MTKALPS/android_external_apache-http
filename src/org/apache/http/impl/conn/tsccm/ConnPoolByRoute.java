@@ -326,6 +326,9 @@ public class ConnPoolByRoute extends AbstractConnPool {
 
                 } else {
 
+                    ///M: Debugging logging for http connection blocking
+                    System.out.println("[CDS][HTTP]Need to wait for connection" + " [" + route + "][" + state + "]");
+
                     if (log.isDebugEnabled()) {
                         log.debug("Need to wait for connection" +
                                 " [" + route + "][" + state + "]");

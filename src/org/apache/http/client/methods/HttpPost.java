@@ -81,6 +81,11 @@ public class HttpPost extends HttpEntityEnclosingRequestBase {
      */
     public HttpPost(final String uri) {
         super();
+
+        ///M: ALPS00612009 Fix URI null exception
+        if(uri == null){
+            throw new IllegalArgumentException();
+        }
         setURI(URI.create(uri));
     }
 

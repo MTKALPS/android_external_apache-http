@@ -121,7 +121,12 @@ public class HttpRequestExecutor {
         }
 
         try {
+            /** M: debug purpose - print the log before the HTTP REQUEST is sending */
+            System.out.println(">doSendRequest");
             HttpResponse response = doSendRequest(request, conn, context);
+            /** M: debug purpose - print the log after the HTTP REQUEST is sent */
+            System.out.println("<doSendRequest");
+
             if (response == null) {
                 response = doReceiveResponse(request, conn, context);
             }
